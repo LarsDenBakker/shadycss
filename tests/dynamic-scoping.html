@@ -139,6 +139,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     </template>
   </template>
 
+  <template id="x-light-dom-dynamic">
+    <h2>light dom dynamic</h2>
+    <p>here .target elements are gray</p>
+    <div class="target">I'm gray</div>
+    <template id="renderer">
+      <div class="target"></div>
+    </template>
+  </template>
+
   <template id="x-container-dynamic">
     <style>
       .target {
@@ -217,21 +226,27 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           done();
         });
       })
-      function makeDynamicElement(name, connectedCallback) {
+      function makeDynamicElement(name, connectedCallback, createShadowRoot = true) {
         let template = document.querySelector(`template#${name}`);
-        if (template && window.ShadyCSS) {
+        if (createShadowRoot && template && window.ShadyCSS) {
           window.ShadyCSS.prepareTemplate(template, name);
         }
         window.customElements.define(name, class extends window.HTMLElement {
           constructor() {
             super();
-            if (template && !this.shadowRoot) {
-              this.attachShadow({mode: 'open'});
-              this.shadowRoot.appendChild(document.importNode(template.content, true));
+            if (template) {
+              if (createShadowRoot && !this.shadowRoot) {
+                this.attachShadow({mode: 'open'});
+                this.shadowRoot.appendChild(document.importNode(template.content, true));
+              }
             }
           }
           connectedCallback() {
-            window.ShadyCSS && window.ShadyCSS.styleElement(this);
+            createShadowRoot && window.ShadyCSS && window.ShadyCSS.styleElement(this);
+            if (!createShadowRoot) {
+              this.appendChild(document.importNode(template.content, true));
+            }
+
             if (connectedCallback) {
               connectedCallback.call(this);
             }
@@ -249,17 +264,23 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         }
         makeDynamicElement('x-container-dynamic');
         makeDynamicElement('x-sample-dynamic');
+        makeDynamicElement('x-light-dom-dynamic', undefined, false);
         const dynamicDiv = document.createElement('div');
         dynamicDiv.classList.add('target');
         dynamicDiv.innerText = 'I was created dynamically';
         const dynamicSample = document.createElement('x-sample-dynamic');
+        const dynamicLightDom = document.createElement('x-light-dom-dynamic');
         const dynamicContainer = document.createElement('x-container-dynamic');
         dynamicSample.shadowRoot.appendChild(dynamicDiv);
         dynamicContainer.shadowRoot.appendChild(dynamicSample);
+        dynamicContainer.shadowRoot.appendChild(dynamicLightDom);
         document.querySelector('x-container-dynamic').shadowRoot.appendChild(dynamicContainer);
         requestAnimationFrame(() => {
           dynamicSample.shadowRoot.querySelectorAll('div.target').forEach((target) =>
             assert.equal(getComputedStyle(target).backgroundColor,'rgb(255, 0, 0)'));
+
+          dynamicLightDom.querySelectorAll('div.target').forEach((target) =>
+            assert.equal(getComputedStyle(target).backgroundColor,'rgb(123, 123, 123)'));
           done();
         });
       });
